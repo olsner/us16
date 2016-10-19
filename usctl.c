@@ -124,8 +124,8 @@ const int CTLMSG_TIMEOUT = 1000;
 
 void send_urb(const char* buf, int size) {
     int res = libusb_control_transfer(h,
-            SND_US16X08_URB_REQUEST,
             SND_US16X08_URB_REQUESTTYPE,
+            SND_US16X08_URB_REQUEST,
             0, 0,
             (char *)buf,
             size,
@@ -192,11 +192,11 @@ int main() {
 
     // I wonder what selects left/right here, because only the channel number
     // differs...
-#define set_computer_l(ch) \
+#define set_master_l(ch) \
     MSGCAT 2, MSGCH ch, 0x41, 1, \
     MSGCAT 1, MSGCH ch, 0x42, 1, 0x43, 1, \
     EOM
-#define set_master_l(ch) \
+#define set_computer_l(ch) \
     MSGCAT 3, MSGCH ch, 0x41, 1, \
     MSGCAT 1, MSGCH ch, 0x42, 1, 0x43, 1, \
     EOM
