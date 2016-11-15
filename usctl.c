@@ -10,7 +10,8 @@
 
 // Common Channel control IDs
 #define SND_US16X08_ID_PHASE 0x85
-// 0x84
+// Just a guess - looks like solo actually rather sets mute on everything else
+// #define SND_US16X08_ID_SOLO 0x84
 #define SND_US16X08_ID_MUTE 0x83
 #define SND_US16X08_ID_FADER 0x81
 #define SND_US16X08_ID_PAN 0x82
@@ -126,6 +127,7 @@ void send_urb(const char* buf, int size) {
     int res = libusb_control_transfer(h,
             SND_US16X08_URB_REQUESTTYPE,
             SND_US16X08_URB_REQUEST,
+            // value = index = 0
             0, 0,
             (char *)buf,
             size,
@@ -150,6 +152,40 @@ void mix(int channel, int controller, int value) {
     };
 
     send_urb(buf, sizeof(buf));
+}
+
+#define MSGCAT 0x61, 0x02,
+#define MSGCH 0x62, 0x02,
+#define EOM 0x00, 0x00
+
+    // I wonder what selects left/right here, because only the channel number
+    // differs...
+#define set_master_l(ch) \
+    MSGCAT 2, MSGCH ch, 0x41, 1, \
+    MSGCAT 1, MSGCH ch, 0x42, 1, 0x43, 1, \
+    EOM
+#define set_computer_l(ch) \
+    MSGCAT 3, MSGCH ch, 0x41, 1, \
+    MSGCAT 1, MSGCH ch, 0x42, 1, 0x43, 1, \
+    EOM
+
+// Not sure if this is the right way to think of it, want to see what gets sent
+// when setting channels 2..8 to master l, r, and computer 1..8.
+#define SRC_MASTER 2
+#define SRC_COMPUTER 3
+
+void set_source(int channel, int src) {
+    if (!(src == SRC_MASTER || src == SRC_COMPUTER)) {
+        fprintf(stderr, "Invalid source %#x\n", src);
+        return;
+    }
+
+    const uint8_t msg[] = {
+        MSGCAT src, MSGCH channel, 0x41, 1,
+        MSGCAT 1, MSGCH channel, 0x42, 1, 0x43, 1,
+        EOM
+    };
+    send_urb(msg, sizeof(msg));
 }
 
 int main() {
@@ -178,34 +214,27 @@ int main() {
         LIBUSB_ERROR(was_kernel_active, "driver_active");
         abort();
     }
-    if (was_kernel_active) {
+    if (1 || was_kernel_active) {
         LIBUSB_(detach_kernel_driver, h, IFACENUM);
         printf("Detached kernel driver.\n");
     }
 
-    mix(9, SND_US16X08_ID_FADER, 255);
-    mix(9, SND_US16X08_ID_MUTE, 0);
+    //mix(9, SND_US16X08_ID_FADER, 255);
+    //mix(11, SND_US16X08_ID_FADER, 255);
+    //mix(12, SND_US16X08_ID_FADER, 255);
+    //mix(9, SND_US16X08_ID_MUTE, 0);
 
-#define MSGCAT 0x61, 0x02,
-#define MSGCH 0x62, 0x02,
-#define EOM 0x00, 0x00
+#if 1
+#if 0
+    set_source(1, SRC_MASTER);
+    set_source(2, SRC_MASTER);
+#else
+    set_source(1, SRC_COMPUTER);
+    set_source(2, SRC_COMPUTER);
+#endif
+#endif
 
-    // I wonder what selects left/right here, because only the channel number
-    // differs...
-#define set_master_l(ch) \
-    MSGCAT 2, MSGCH ch, 0x41, 1, \
-    MSGCAT 1, MSGCH ch, 0x42, 1, 0x43, 1, \
-    EOM
-#define set_computer_l(ch) \
-    MSGCAT 3, MSGCH ch, 0x41, 1, \
-    MSGCAT 1, MSGCH ch, 0x42, 1, 0x43, 1, \
-    EOM
-
-    static const uint8_t msg[] = { set_master_l(1), };
-
-    send_urb(msg, sizeof(msg));
-
-    if (was_kernel_active) {
+    if (1 || was_kernel_active) {
         printf("Done, reattaching kernel driver.\n");
         LIBUSB_(attach_kernel_driver, h, IFACENUM);
     }
