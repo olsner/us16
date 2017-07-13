@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include <libusb.h>
 
@@ -114,7 +115,7 @@ static int was_kernel_active;
         int e__ = (expr); \
         if (e__) { \
             LIBUSB_ERROR(e__, #expr); \
-            abort(); \
+            return 1; \
         } \
     } while (0)
 
@@ -188,17 +189,68 @@ void set_source(int channel, int src) {
     send_urb(msg, sizeof(msg));
 }
 
-int main() {
+enum cmd {
+    CMD_UNKNOWN,
+    CMD_HELP,
+    CMD_MASTER,
+    CMD_COMPUTER,
+    // ...
+    CMD_COUNT,
+};
+const char *const cmd_names[CMD_COUNT] = {
+    NULL,
+    "--help",
+    "master",
+    "computer"
+};
+
+enum cmd parse_command(const char *cmd) {
+    for (size_t i = 0; i < CMD_COUNT; i++) {
+        if (!cmd_names[i]) continue;
+
+        if (!strcasecmp(cmd, cmd_names[i])) {
+            return (enum cmd)i;
+        }
+    }
+    return CMD_UNKNOWN;
+}
+
+void usage(FILE *out, const char *argv[]) {
+    fprintf(out,
+            "Usage: %s COMMAND [ARGS...]\n"
+            "Valid commands are:\n"
+            " master - send master mix of inputs to master output\n"
+            " computer - send (only) output channel 1/2 to master output\n"
+            , argv[0]);
+}
+
+int main(int argc, const char *argv[]) {
+    if (argc < 2) {
+        usage(stderr, argv);
+        return 1;
+    }
+    enum cmd cmd = parse_command(argv[1]);
+    switch (cmd) {
+    case CMD_UNKNOWN:
+        fprintf(stderr, "Unknown command: %s\n", argv[1]);
+        usage(stderr, argv);
+        return 1;
+    case CMD_HELP:
+        usage(stdout, argv);
+        return 0;
+    }
+
     LIBUSB_(init, &ctx);
     libusb_set_debug(ctx, 3);
 
     h = libusb_open_device_with_vid_pid(ctx, 0x0644, 0x8047);
     if (!h) {
         fprintf(stderr, "No US-16x08 found.\n");
-        abort();
+        return 1;
     }
     dev = libusb_get_device(h);
     if (!dev) {
+        fprintf(stderr, "libusb_get_device failed.\n");
     }
     printf("Found US-16x08 at %d:%d\n",
             libusb_get_bus_number(dev),
@@ -212,9 +264,9 @@ int main() {
     was_kernel_active = libusb_kernel_driver_active(h, IFACENUM);
     if (!(was_kernel_active == 0 || was_kernel_active == 1)) {
         LIBUSB_ERROR(was_kernel_active, "driver_active");
-        abort();
+        return 1;
     }
-    if (1 || was_kernel_active) {
+    if (was_kernel_active) {
         LIBUSB_(detach_kernel_driver, h, IFACENUM);
         printf("Detached kernel driver.\n");
     }
@@ -224,21 +276,23 @@ int main() {
     //mix(12, SND_US16X08_ID_FADER, 255);
     //mix(9, SND_US16X08_ID_MUTE, 0);
 
-#if 1
-#if 0
-    set_source(1, SRC_MASTER);
-    set_source(2, SRC_MASTER);
-#else
-    set_source(1, SRC_COMPUTER);
-    set_source(2, SRC_COMPUTER);
-#endif
-#endif
+    switch (cmd) {
+    case CMD_MASTER:
+        set_source(1, SRC_MASTER);
+        set_source(2, SRC_MASTER);
+        break;
+    case CMD_COMPUTER:
+        set_source(1, SRC_COMPUTER);
+        set_source(2, SRC_COMPUTER);
+        break;
+    }
 
-    if (1 || was_kernel_active) {
+    if (was_kernel_active) {
         printf("Done, reattaching kernel driver.\n");
         LIBUSB_(attach_kernel_driver, h, IFACENUM);
     }
 
     libusb_close(h);
     libusb_exit(ctx);
+    return 0;
 }
