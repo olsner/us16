@@ -252,9 +252,12 @@ int main(int argc, const char *argv[]) {
     if (!dev) {
         fprintf(stderr, "libusb_get_device failed.\n");
     }
-    printf("Found US-16x08 at %d:%d\n",
+    int configuration;
+    LIBUSB_(get_configuration, h, &configuration);
+    printf("Found US-16x08 at %d:%d, bConfigurationValue=%d\n",
             libusb_get_bus_number(dev),
-            libusb_get_device_address(dev));
+            libusb_get_device_address(dev),
+            configuration);
 
     // US16x08 URBs are send to "control pipe" (linux usb thing?) for endpoint
     // 0. But which interface?
