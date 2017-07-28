@@ -273,6 +273,7 @@ int main(int argc, const char *argv[]) {
         LIBUSB_(detach_kernel_driver, h, IFACENUM);
         printf("Detached kernel driver.\n");
     }
+    LIBUSB_(claim_interface, h, 0);
 
     //mix(9, SND_US16X08_ID_FADER, 255);
     //mix(11, SND_US16X08_ID_FADER, 255);
@@ -290,6 +291,7 @@ int main(int argc, const char *argv[]) {
         break;
     }
 
+    LIBUSB_(release_interface, h, 0);
     if (was_kernel_active) {
         printf("Done, reattaching kernel driver.\n");
         LIBUSB_(attach_kernel_driver, h, IFACENUM);
