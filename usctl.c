@@ -194,14 +194,15 @@ enum cmd {
     CMD_HELP,
     CMD_MASTER,
     CMD_COMPUTER,
-    // ...
+    CMD_RESET,
     CMD_COUNT,
 };
 const char *const cmd_names[CMD_COUNT] = {
     NULL,
     "--help",
     "master",
-    "computer"
+    "computer",
+    "reset",
 };
 
 enum cmd parse_command(const char *cmd) {
@@ -288,6 +289,12 @@ int main(int argc, const char *argv[]) {
     case CMD_COMPUTER:
         set_source(1, SRC_COMPUTER);
         set_source(2, SRC_COMPUTER);
+        break;
+    case CMD_RESET:
+        // TODO Maybe skip the driver detach/attach when resetting? This also
+        // seems to put the usb device in a weird state, so might be a bad idea
+        // anyway :P
+        LIBUSB_(reset_device, h);
         break;
     }
 
